@@ -1,0 +1,21 @@
+# Music files
+*.flac
+*.mp3
+*.wav
+*.aac
+*.ogg
+*.wma
+*.m4a
+
+# Node modules
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temp/IDE
+*.tmp
+.vscode/
+.idea/

@@ -7,6 +7,13 @@
 *.wma
 *.m4a
 
+# Encrypted NCM source files
+VipSongsDownload/
+
+# Generated outputs (local only)
+CloudMusic_Playlist.m3u8
+CloudMusic_Playlist_order.txt
+
 # Node modules
 node_modules/
 

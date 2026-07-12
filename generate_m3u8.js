@@ -81,21 +81,25 @@ async function main() {
             .replace(/[＆&]/g, '&').replace(/[　 ]+/g, ' ')
             .replace(/\s*,\s*/g, '|')
             .replace(/[（）()\[\]【】「」『』〈〉]/g, '')
-            .replace(/[、。，,.]/g, '|')
-            .replace(/[◆◇■□▲△▼▽●○★☆]/g, '')
+            .replace(/[、。，]/g, '|')
+            .replace(/\s*\.\s+/g, '|')   // "feat. X" separators (dot with trailing space)
+            .replace(/\./g, '')          // remove remaining dots (abbrev like S.O.S. → SOS)
+            .replace(/\s*-\s*/g, '|')    // "title - year" separators (preserves T-ara since no spaces)
+            .replace(/\|?feat(\|.*)?$/, '') // strip "feat. X" suffix (too generic, causes cross-match)
             .replace(/\|+/g, '|').replace(/^\||\|$/g, '')
             .replace(/\s+/g, ' ').trim();
     }
 
     function tokenize(s) {
-        return normalize(s).split('|').filter(t => t.length > 1);
+        // Filter out only single ASCII letters (a-z), keep CJK chars and other meaningful single chars
+        return normalize(s).split('|').filter(t => t.length > 1 || /[^\x00-\x7F]/.test(t) || /[0-9]/.test(t));
     }
 
     function matchScore(track, filename) {
         const fnTokens = tokenize(path.basename(filename, path.extname(filename)));
         const nameTokens = tokenize(track.name);
         const artistTokens = track.artists.flatMap(a => tokenize(a.name));
-        if (nameTokens.length === 0) return 0;
+        if (nameTokens.length === 0) return { score: 0, nameRatio: 0, artistRatio: 0 };
 
         const nameMatch = nameTokens.filter(nt =>
             fnTokens.some(ft => ft.includes(nt) || nt.includes(ft))
@@ -105,7 +109,11 @@ async function main() {
             ? artistTokens.filter(at => fnTokens.some(ft => ft.includes(at) || at.includes(ft))).length / artistTokens.length
             : 1;
 
-        return nameMatch * 0.6 + artistMatch * 0.4;
+        return {
+            score: nameMatch * 0.6 + artistMatch * 0.4,
+            nameRatio: nameMatch,
+            artistRatio: artistMatch
+        };
     }
 
     const playlistOrder = [];
@@ -113,12 +121,13 @@ async function main() {
     const matchedFiles = new Set();
 
     for (const track of orderedTracks) {
-        let bestFile = null, bestScore = 0;
+        let bestFile = null, bestScore = 0, bestNameRatio = 0;
         for (const file of localFiles) {
-            const s = matchScore(track, file);
-            if (s > bestScore) { bestScore = s; bestFile = file; }
+            const { score, nameRatio } = matchScore(track, file);
+            if (score > bestScore) { bestScore = score; bestFile = file; bestNameRatio = nameRatio; }
         }
-        if (bestScore >= 0.8) {
+        // Accept if overall score >= 0.8, OR name matches well (handles Senya/森永真由美 alias)
+        if (bestScore >= 0.8 || bestNameRatio >= 0.9) {
             playlistOrder.push(bestFile);
             matchedFiles.add(bestFile.toLowerCase());
             matched++;
